@@ -10,31 +10,55 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.todoapp.Model.Task
 import com.example.todoapp.ViewModels.TaskViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToDoApp(
     viewModel: TaskViewModel = viewModel()
 ){
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+
     var tasks = viewModel.tasks
     val pendingTasks = tasks.filter { !it.isCompleted }
     val completedTasks = tasks.filter { it.isCompleted }
@@ -56,7 +80,9 @@ fun ToDoApp(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
             Button(onClick = {
-                viewModel.addTask("Nueva tarea")
+                scope.launch {
+                    sheetState.show()
+                }
             },
                 modifier = Modifier.weight(1f)
             ){
@@ -95,7 +121,50 @@ fun ToDoApp(
                 )
             }
         }
+        if (sheetState.isVisible) {
+            ModalBottomSheet(
+                sheetState = sheetState,
+                onDismissRequest = {
+                    scope.launch {
+                        sheetState.hide()
+                    }
+                },
+            ){
+                var text by rememberSaveable { mutableStateOf("") }
+                Column(
+                    modifier = Modifier.padding(bottom = 16.dp, start = 8.dp, end = 8.dp)
+                ){
+                    Text("Descripción de la tarea")
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                    ){
+                        TextField(
+                            value = text,
+                            onValueChange = { text = it },
+                            modifier = Modifier.fillMaxWidth()
+                                .weight(4f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    if(!text.isNullOrEmpty()){
+                                        viewModel.addTask(text)
+                                        sheetState.hide()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            shape = CircleShape
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = "Agregar tarea")
+                        }
+                    }
+                }
+            }
+        }
         Spacer(modifier = Modifier.height(16.dp))
+
     }
 }
 

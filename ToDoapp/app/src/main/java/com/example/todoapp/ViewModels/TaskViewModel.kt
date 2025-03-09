@@ -1,21 +1,45 @@
 package com.example.todoapp.ViewModels
 
+import android.app.Application
 import androidx.compose.runtime.mutableStateListOf
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.room.Room
+import com.example.todoapp.AppDatabase
 import com.example.todoapp.Model.Task
+import com.example.todoapp.Repositories.TaskRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
-class TaskViewModel: ViewModel(){
-    private val _tasks = mutableStateListOf<Task>()
-    val tasks : List<Task>
-        get() = _tasks
+class TaskViewModel(application: Application): AndroidViewModel(application){
+    private val db = Room.databaseBuilder(
+        application,
+        AppDatabase::class.java, "tasks-db"
+    ).build()
+
+    private val repository = TaskRepository(db.taskDao())
+
+    private val _tasks = MutableStateFlow<List<Task>>(emptyList())
+    val tasks : StateFlow<List<Task>> = _tasks
+
+    init {
+        viewModelScope.launch {
+            repository.tasksFlow.collect{ taskList ->
+                _tasks.value = taskList
+            }
+        }
+    }
 
     /**
      * Función que agrega una tarea a la lista de tareas.
      * @param title Título de la tarea a agregar.
      */
     fun addTask(title: String){
-        val newId = (_tasks.maxOfOrNull { it.id } ?: 0) + 1 // Si no hay tareas, el id es 0, si hay tareas, el id es el máximo + 1
-        _tasks.add(Task(newId, title))
+        viewModelScope.launch {
+            repository.insertTask(Task(title = title))
+        }
     }
     /**
      * Función que cambia el estado de una tarea.
@@ -24,9 +48,8 @@ class TaskViewModel: ViewModel(){
      *
      */
     fun toggleTask(task: Task){
-        val index = _tasks.indexOf(task)
-        if(index != -1){
-            _tasks[index] = task.copy(isCompleted = !task.isCompleted)
+        viewModelScope.launch {
+            repository.updateTask(task.copy(isCompleted = !task.isCompleted))
         }
     }
 
@@ -35,6 +58,8 @@ class TaskViewModel: ViewModel(){
      * @param task Tarea a eliminar.
      */
     fun removeTask(task: Task){
-        _tasks.remove(task)
+        viewModelScope.launch {
+            repository.deleteTask(task)
+        }
     }
 }
